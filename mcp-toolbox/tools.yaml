@@ -1,0 +1,230 @@
+sources:
+  bq_supply_chain:
+    kind: bigquery
+    project: sm-gemini-playground
+    location: europe-north1
+
+tools:
+  get_inventory_levels:
+    kind: bigquery-sql
+    source: bq_supply_chain
+    description: Get inventory quantity and threshold for an electronics item.
+    parameters:
+      - name: item_name
+        type: string
+        description: Full or partial electronics item name.
+    statement: |
+      SELECT
+        item_id,
+        item_name,
+        quantity,
+        reorder_threshold,
+        unit_price,
+        updated_at
+      FROM `sm-gemini-playground.supply_chain.inventory`
+      WHERE LOWER(item_name) LIKE CONCAT('%', LOWER(@item_name), '%')
+      ORDER BY quantity ASC
+      LIMIT 5
+
+  get_item_details:
+    kind: bigquery-sql
+    source: bq_supply_chain
+    description: Fetch detailed item record by item id.
+    parameters:
+      - name: item_id
+        type: string
+        description: Unique item identifier.
+    statement: |
+      SELECT
+        item_id,
+        item_name,
+        category,
+        brand,
+        unit_price,
+        quantity,
+        reorder_threshold,
+        supplier_id,
+        warehouse_location
+      FROM `sm-gemini-playground.supply_chain.inventory`
+      WHERE item_id = @item_id
+      LIMIT 1
+
+  calculate_total_cost:
+    kind: bigquery-sql
+    source: bq_supply_chain
+    description: Calculate total replenishment cost for an item and quantity.
+    parameters:
+      - name: item_id
+        type: string
+        description: Item id to order.
+      - name: quantity
+        type: integer
+        description: Quantity to order.
+    statement: |
+      SELECT
+        i.item_id,
+        i.item_name,
+        i.unit_price,
+        @quantity AS requested_quantity,
+        CAST(i.unit_price * @quantity AS NUMERIC) AS total_cost
+      FROM `sm-gemini-playground.supply_chain.inventory` i
+      WHERE i.item_id = @item_id
+      LIMIT 1
+
+  insert_quote_header:
+    kind: bigquery-sql
+    source: bq_supply_chain
+    description: Insert extracted quote/proforma header into BigQuery.
+    parameters:
+      - name: quote_id
+        type: string
+        description: Quote id from document.
+      - name: quote_date
+        type: string
+        description: Quote date as YYYY-MM-DD.
+      - name: supplier_name
+        type: string
+        description: Supplier name on quote.
+      - name: customer_name
+        type: string
+        description: Customer name on quote.
+      - name: currency
+        type: string
+        description: Currency code, for example USD.
+      - name: subtotal_amount
+        type: float
+        description: Quote subtotal amount.
+      - name: tax_amount
+        type: float
+        description: Tax amount.
+      - name: total_amount
+        type: float
+        description: Quote grand total amount.
+      - name: source_filename
+        type: string
+        description: Uploaded filename or source reference.
+    statement: |
+      INSERT INTO `sm-gemini-playground.supply_chain.quote_documents`
+      (
+        quote_id,
+        quote_date,
+        supplier_name,
+        customer_name,
+        currency,
+        subtotal_amount,
+        tax_amount,
+        total_amount,
+        source_filename,
+        extracted_at
+      )
+      VALUES
+      (
+        @quote_id,
+        SAFE_CAST(@quote_date AS DATE),
+        @supplier_name,
+        @customer_name,
+        @currency,
+        CAST(@subtotal_amount AS NUMERIC),
+        CAST(@tax_amount AS NUMERIC),
+        CAST(@total_amount AS NUMERIC),
+        @source_filename,
+        CURRENT_TIMESTAMP()
+      )
+
+  insert_quote_line_item:
+    kind: bigquery-sql
+    source: bq_supply_chain
+    description: Insert one extracted quote line item into BigQuery.
+    parameters:
+      - name: quote_id
+        type: string
+        description: Quote id that owns this line.
+      - name: line_number
+        type: integer
+        description: Line number in quote.
+      - name: item_id
+        type: string
+        description: Item id from quote.
+      - name: item_name
+        type: string
+        description: Item description.
+      - name: quantity
+        type: integer
+        description: Quoted quantity.
+      - name: unit_price
+        type: float
+        description: Quoted unit price.
+      - name: line_total
+        type: float
+        description: Quoted line total.
+    statement: |
+      INSERT INTO `sm-gemini-playground.supply_chain.quote_line_items`
+      (
+        quote_id,
+        line_number,
+        item_id,
+        item_name,
+        quantity,
+        unit_price,
+        line_total
+      )
+      VALUES
+      (
+        @quote_id,
+        @line_number,
+        @item_id,
+        @item_name,
+        @quantity,
+        CAST(@unit_price AS NUMERIC),
+        CAST(@line_total AS NUMERIC)
+      )
+
+  validate_quote_match:
+    kind: bigquery-sql
+    source: bq_supply_chain
+    description: Validate expected item/quantity/total against extracted quote values.
+    parameters:
+      - name: quote_id
+        type: string
+        description: Quote id to validate.
+      - name: expected_item_id
+        type: string
+        description: Expected inventory item id from replenishment request.
+      - name: expected_quantity
+        type: integer
+        description: Expected replenishment quantity.
+      - name: expected_total
+        type: float
+        description: Expected replenishment total.
+    statement: |
+      WITH quote_totals AS (
+        SELECT
+          q.quote_id,
+          q.total_amount AS quote_total,
+          SUM(CASE WHEN li.item_id = @expected_item_id THEN li.quantity ELSE 0 END) AS matched_item_qty
+        FROM `sm-gemini-playground.supply_chain.quote_documents` q
+        LEFT JOIN `sm-gemini-playground.supply_chain.quote_line_items` li
+          ON q.quote_id = li.quote_id
+        WHERE q.quote_id = @quote_id
+        GROUP BY q.quote_id, q.total_amount
+      )
+      SELECT
+        quote_id,
+        quote_total,
+        matched_item_qty,
+        @expected_quantity AS expected_quantity,
+        CAST(@expected_total AS NUMERIC) AS expected_total,
+        (matched_item_qty = @expected_quantity) AS quantity_match,
+        (quote_total = CAST(@expected_total AS NUMERIC)) AS total_match,
+        ((matched_item_qty = @expected_quantity) AND (quote_total = CAST(@expected_total AS NUMERIC))) AS is_match
+      FROM quote_totals
+
+toolsets:
+  inventory_toolset:
+    - get_inventory_levels
+    - get_item_details
+    - calculate_total_cost
+  document_intake_toolset:
+    - insert_quote_header
+    - insert_quote_line_item
+    - validate_quote_match

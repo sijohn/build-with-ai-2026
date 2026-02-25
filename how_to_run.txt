@@ -1,0 +1,24 @@
+cd /Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent
+source .venv/bin/activate
+export TOOLBOX_URL=http://127.0.0.1:5100
+./toolbox --tools-file mcp-toolbox/tools.yaml --address 127.0.0.1 --port 5100
+In another terminal:
+
+cd /Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent
+source .venv/bin/activate
+export A2A_HOST=127.0.0.1 
+export A2A_PORT=8001 
+export GOOGLE_GENAI_USE_VERTEXAI=True
+export GOOGLE_CLOUD_PROJECT=sm-gemini-playground
+export GOOGLE_CLOUD_LOCATION=us-central1
+uvicorn remote_agent.finance_agent.agent:a2a_app --host 127.0.0.1 --port 8001
+
+In a third terminal:
+cd /Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent
+source .venv/bin/activate
+export TOOLBOX_URL=http://127.0.0.1:5100
+uv run adk web --port 8002
+
+
+====
+http://localhost:8001/.well-known/agent-card.json
