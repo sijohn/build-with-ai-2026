@@ -38,7 +38,7 @@ demo.md
 
 - Python 3.10+
 - `uv` installed
-- Google Cloud access to project `sm-gemini-playground`
+- Google Cloud access to project `<GCP_PROJECT_ID>`
 - BigQuery permissions for dataset/table create + query
 - ADC configured (`gcloud auth application-default login`) if using Vertex AI/BigQuery locally
 
@@ -65,7 +65,7 @@ export TOOLBOX_URL=http://127.0.0.1:5100
 export A2A_HOST=127.0.0.1
 export A2A_PORT=8001
 export GOOGLE_GENAI_USE_VERTEXAI=True
-export GOOGLE_CLOUD_PROJECT=sm-gemini-playground
+export GOOGLE_CLOUD_PROJECT=<GCP_PROJECT_ID>
 export GOOGLE_CLOUD_LOCATION=us-central1
 ```
 
@@ -77,8 +77,8 @@ Note:
 
 Run these SQL files in BigQuery:
 
-1. `/Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent/sql/bigquery/01_create_tables.sql`
-2. `/Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent/sql/bigquery/02_insert_test_data.sql`
+1. `supply_chain_agent/sql/bigquery/01_create_tables.sql`
+2. `build-with-ai-2026/supply_chain_agent/sql/bigquery/02_insert_test_data.sql`
 
 They create and seed:
 - `inventory`
@@ -93,7 +93,7 @@ They create and seed:
 ### Terminal 1: MCP toolbox server
 
 ```bash
-cd /Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent
+
 export TOOLBOX_URL=http://127.0.0.1:5100
 ./toolbox --tools-file mcp-toolbox/tools.yaml --address 127.0.0.1 --port 5100
 ```
@@ -101,11 +101,11 @@ export TOOLBOX_URL=http://127.0.0.1:5100
 ### Terminal 2: Remote finance A2A agent server
 
 ```bash
-cd /Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent
+
 export A2A_HOST=127.0.0.1
 export A2A_PORT=8001
 export GOOGLE_GENAI_USE_VERTEXAI=True
-export GOOGLE_CLOUD_PROJECT=sm-gemini-playground
+export GOOGLE_CLOUD_PROJECT=<GCP_PROJECT_ID>
 export GOOGLE_CLOUD_LOCATION=us-central1
 uv run uvicorn remote_agent.finance_agent.agent:a2a_app --host 127.0.0.1 --port 8001
 ```
@@ -119,18 +119,13 @@ curl http://localhost:8001/.well-known/agent-card.json
 ### Terminal 3: ADK web UI
 
 ```bash
-cd /Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent
+
 export TOOLBOX_URL=http://127.0.0.1:5100
 uv run adk web --port 8002
 ```
 
 Open ADK UI and load package `supply_chain_agent_demo`.
 
-## 5. Run demo prompts
-
-- Base flow prompts: `/Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent/demo.md`
-- Optional quote/proforma multimodal flow: same file, section `Full flow with quote/proforma upload`
-- Sample quote asset for upload/demo: `/Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent/demo_assets/proforma_quote_alpha_retail.md`
 
 ## Troubleshooting
 
