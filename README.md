@@ -7,7 +7,6 @@ Multi-agent ADK demo with:
 - `finance_agent` (remote A2A server)
 - `logistics_agent` (shipping options + execution)
 
-This README is the primary runbook and aligns with `/Users/sijohnmathew/Documents/Projects/build-with-ai-2026/supply_chain_agent/how_to_run.txt`.
 
 ## Project structure
 
